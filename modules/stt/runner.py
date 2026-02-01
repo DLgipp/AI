@@ -18,6 +18,7 @@ SILENCE_FRAMES_TO_END = 3
 PRE_SPEECH_FRAMES = 2
 POST_SPEECH_FRAMES = 2
 
+from modules.stt.logger import log
 
 def run_stt_loop():
     stt = WhisperSTT()
@@ -32,7 +33,7 @@ def run_stt_loop():
     post_speech_counter = 0
     speech_start_time = None
 
-    print("[STT] Real-time режим с padding запущен. Говорите...")
+    log("Real-time режим с padding запущен. Говорите...", role="SYSTEM", stage="stt_loop")
 
     while True:
         frame = record_frame()
@@ -53,13 +54,14 @@ def run_stt_loop():
             if not speech_active:
                 speech_active = True
                 speech_start_time = time.time()
-                speech_buffer = list(pre_speech_buffer)  # ← КЛЮЧЕВО
+                speech_buffer = list(pre_speech_buffer)
+                log("Speech detected, starting capture", role="PIPELINE", stage="vad")
             speech_buffer.append(frame)
 
         else:
             if speech_active:
                 silence_counter += 1
-                speech_buffer.append(frame)  # ← post-padding
+                speech_buffer.append(frame)
 
                 if silence_counter >= SILENCE_FRAMES_TO_END:
                     post_speech_counter += 1
@@ -71,12 +73,12 @@ def run_stt_loop():
 
                         audio = np.concatenate(speech_buffer)
                         speech_buffer = []
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Запускаем проверку функции")
+                        log("Speech segment captured, sending to STT", role="PIPELINE", stage="stt_loop", payload=f"{len(audio)} samples")
 
-
-                        text = stt.transcribe(audio)
-                        if text:
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] функции")
-                            print(f"[STT] {text}")
-                            return(text)
-                            
+                        try:
+                            text = stt.transcribe(audio)
+                            if text:
+                                log(f"Transcription result: {text}", role="USER", stage="stt", payload=None)
+                                return text
+                        except Exception as e:
+                            log(f"STT error: {e}", role="ERROR", stage="stt")

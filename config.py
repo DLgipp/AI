@@ -1,7 +1,7 @@
 SAMPLE_RATE = 16000
 CHANNELS = 1
 
-FRAME_DURATION = 0.5        # секунд
+FRAME_DURATION = 0.3        # секунд
 MAX_SPEECH_DURATION = 15.0  # защита от зависания
 
 WHISPER_MODEL = "large-v2"
