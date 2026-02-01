@@ -1,0 +1,7 @@
+pyttsx3            # TTS
+SpeechRecognition  # STT
+pyaudio            # для микрофона
+opencv-python      # работа с экраном/камерой
+pynput             # события клавиатуры и мыши
+python-dotenv      # для переменных окружения
+ollama
