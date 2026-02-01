@@ -19,10 +19,12 @@ PRE_SPEECH_FRAMES = 2
 POST_SPEECH_FRAMES = 2
 
 from modules.stt.logger import log
+stt = WhisperSTT()
+vad = SileroVAD()
 
 def run_stt_loop():
-    stt = WhisperSTT()
-    vad = SileroVAD()
+    
+    
 
     frame_buffer = deque(maxlen=VAD_FRAMES)
     pre_speech_buffer = deque(maxlen=PRE_SPEECH_FRAMES)

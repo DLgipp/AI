@@ -1,15 +1,23 @@
 from ollama import chat
-from config import SYSTEM_PROMPT, MAX_HISTORY, MODEL_NAME, MAX_TOKENS
+from config import SYSTEM_PROMPT, MAX_HISTORY, MODEL_NAME, MAX_TOKENS, MARIN_PERSONA
 from modules.llm.history_manager import get_history, add_to_history
 from modules.llm.logger import log_entry
 from modules.stt.logger import log
 
+from modules.llm.session_memory.memory_manager import SessionMemory
+
 import time
+
+session = SessionMemory(user_id="user_123")  # можно динамически подставлять user_id
 
 def generate_response(user_input, history:list):
     try:
+        # формируем системный промт с учетом личности
+        last_topic = session.get("last_topic", "нет темы")
+        user_name = session.get("user_name", "Пользователь")
+        system_prompt = f"""Ты — {MARIN_PERSONA['name']}, {MARIN_PERSONA['role']}. Стиль речи: {MARIN_PERSONA['style']}. Используй эмоциональные вставки: {', '.join(MARIN_PERSONA['speech_markers'])}. {SYSTEM_PROMPT}  # общий системный контекст"""
         prompt = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": system_prompt},
             *get_history(),
             {"role": "user", "content": user_input},
         ]
@@ -31,6 +39,9 @@ def generate_response(user_input, history:list):
 
         content = response["message"]["content"]
         add_to_history(user_input, content)
+
+        session.set("last_topic", user_input)  # можно более умно определять тему
+        session.set("last_response", content)
 
         log(f"LLM response received", role="PIPELINE", stage="LLM", payload=f"{len(content)} chars, latency={latency_ms:.1f} ms")
         log(f"Response content: {content}", role="ASSISTANT", stage="LLM")

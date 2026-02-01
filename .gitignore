@@ -25,4 +25,8 @@ dist/
 # Logs
 *.log
 
+# Environment variables
 .env
+
+# Session memory files
+.memory/
