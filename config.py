@@ -27,3 +27,5 @@ MARIN_PERSONA = {
         "формальность": "низкая"
     }
 }
+
+MEMORY_DB_PATH = "data/memory.db"

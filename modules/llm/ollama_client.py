@@ -1,33 +1,54 @@
 from ollama import chat
 from config import SYSTEM_PROMPT, MAX_HISTORY, MODEL_NAME, MAX_TOKENS, MARIN_PERSONA
-from modules.llm.history_manager import get_history, add_to_history
+#from modules.llm.history_manager import get_history, add_to_history
 from modules.llm.logger import log_entry
 from modules.stt.logger import log
 
-from modules.llm.session_memory.memory_manager import SessionMemory
+from modules.memory.message_store import SQLiteMessageStore
+from modules.memory.session_state import SQLiteSessionStateStore
+
 
 import time
 
-session = SessionMemory(user_id="user_123")  # можно динамически подставлять user_id
+message_store = SQLiteMessageStore()
+session_state = SQLiteSessionStateStore()
+
+SESSION_ID = "default"  # позже будет реальный id
 
 def generate_response(user_input, history:list):
     try:
+        # 1. Загружаем последние сообщения из БД
+        recent_history = message_store.load_recent(
+            session_id=SESSION_ID,
+            limit=MAX_HISTORY
+        )
+        # 2. Загружаем сессионное состояние
+        session_data = session_state.get_all(SESSION_ID)
+
         # формируем системный промт с учетом личности
-        last_topic = session.get("last_topic", "нет темы")
-        user_name = session.get("user_name", "Пользователь")
-        system_prompt = f"""Ты — {MARIN_PERSONA['name']}, {MARIN_PERSONA['role']}. Стиль речи: {MARIN_PERSONA['style']}. Используй эмоциональные вставки: {', '.join(MARIN_PERSONA['speech_markers'])}. {SYSTEM_PROMPT}  # общий системный контекст"""
+        system_prompt = f"""Ты — {MARIN_PERSONA['name']}, {MARIN_PERSONA['role']}. 
+Стиль речи: {MARIN_PERSONA['style']}. 
+Используй эмоциональные вставки: {', '.join(MARIN_PERSONA['speech_markers'])}. 
+Текущее состояние диалога: {session_data}. 
+{SYSTEM_PROMPT}  # общий системный контекст"""
         prompt = [
             {"role": "system", "content": system_prompt},
-            *get_history(),
+            #*get_history(),
+            *recent_history,
             {"role": "user", "content": user_input},
         ]
 
-        log(f"Sending prompt to LLM", role="PIPELINE", stage="LLM", payload=f"{len(user_input)} chars")
+        log(
+            f"Sending prompt to LLM", 
+            role="PIPELINE", 
+            stage="LLM", 
+            payload=f"{len(user_input)} chars"
+            )
 
         start = time.time()
 
         response = chat(
-            model="llama3.1",
+            model=MODEL_NAME,
             messages=prompt,
             options={
                 "temperature": 0.0,
@@ -38,13 +59,26 @@ def generate_response(user_input, history:list):
         latency_ms = (time.time() - start) * 1000
 
         content = response["message"]["content"]
-        add_to_history(user_input, content)
-
-        session.set("last_topic", user_input)  # можно более умно определять тему
-        session.set("last_response", content)
-
-        log(f"LLM response received", role="PIPELINE", stage="LLM", payload=f"{len(content)} chars, latency={latency_ms:.1f} ms")
-        log(f"Response content: {content}", role="ASSISTANT", stage="LLM")
+        #add_to_history(user_input, content)
+        
+        # 4. Сохраняем сообщения в БД (СЫРЫЕ, без анализа)
+        message_store.save_message(SESSION_ID, "user", user_input)
+        message_store.save_message(SESSION_ID, "assistant", content)
+        
+        # 5. Минимальное обновление состояния (временно)
+        session_state.set(SESSION_ID, "last_user_message", user_input)
+        
+        log(
+            f"LLM response received", 
+            role="PIPELINE", 
+            stage="LLM", 
+            payload=f"{len(content)} chars, latency={latency_ms:.1f} ms"
+            )
+        log(
+            f"Response content: {content}", 
+            role="ASSISTANT", 
+            stage="LLM"
+            )
 
         log_entry({
             "prompt": user_input,
