@@ -15,8 +15,8 @@ class SileroVAD:
             audio_tensor,
             self.model,
             sampling_rate=self.sample_rate,
-            min_speech_duration_ms=300,
-            min_silence_duration_ms=400
+            min_speech_duration_ms=200,
+            min_silence_duration_ms=200
         )
         log(f"VAD detected speech: {len(timestamps) > 0}", role="PIPELINE", stage="VAD", payload=f"{len(audio)} samples")
         return len(timestamps) > 0

@@ -30,3 +30,4 @@ dist/
 
 # Session memory files
 .memory/
+.data/
