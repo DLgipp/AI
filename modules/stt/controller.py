@@ -1,6 +1,7 @@
 import time
 import numpy as np
 from collections import deque
+import asyncio
 
 from modules.stt.audio_capture import record_frame
 from modules.stt.whisper_stt import WhisperSTT
@@ -106,4 +107,10 @@ class STTController:
             self.bus.emit(Event("stt_error", {"error": str(e)}))
 
 
-        
+async def stt_loop(stt: STTController):
+    """Асинхронный цикл STT."""
+    loop = asyncio.get_event_loop()
+    while True:
+        # tick() выполняется в отдельном потоке
+        await loop.run_in_executor(None, stt.tick)
+        await asyncio.sleep(0.02)
