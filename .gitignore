@@ -29,5 +29,5 @@ dist/
 .env
 
 # Session memory files
-.memory/
-.data/
+memory/
+data/
