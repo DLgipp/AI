@@ -7,7 +7,7 @@ class ReactivePolicy:
     def __init__(
         self,
         dialog: DialogueCore,
-        cooldown_sec: float = 20.0
+        cooldown_sec: float = 3.0
     ):
         self._dialog = dialog
         self._cooldown = cooldown_sec

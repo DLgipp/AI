@@ -12,5 +12,5 @@ def record_frame() -> np.ndarray:
         dtype="float32"
     )
     sd.wait()
-    log("Frame recorded", role="PIPELINE", stage="record_frame", payload=f"{len(audio)} samples")
+    #log("Frame recorded", role="PIPELINE", stage="record_frame", payload=f"{len(audio)} samples")
     return audio.flatten()

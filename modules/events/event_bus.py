@@ -5,7 +5,7 @@ import asyncio
 EventHandler = Callable[[Event], None]
 
 class EventBus:
-    def __init__(self, loop: asyncio.AbstractEventLoop):
+    def __init__(self, loop):
         self._subscribers: Dict[str, List[Callable]] = {}
         self.loop = loop  # главный loop
 
@@ -18,6 +18,8 @@ class EventBus:
         """Вызывает подписчиков события. Async handlers запускаются через create_task."""
         handlers = self._subscribers.get(event.type, [])
         #loop = asyncio.get_event_loop()  # главный loop
+        print(f"[EventBus] emitting {event.type} to {len(handlers)} handlers")
+
         for handler in handlers:
             try:
                 result = handler(event)

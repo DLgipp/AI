@@ -18,9 +18,9 @@ POST_SPEECH_FRAMES = 2
 PRE_SPEECH_FRAMES = 1
 
 class STTController:
-    def __init__(self, bus, silence_timeout=10):
+    def __init__(self, bus, silence_timer):
         self.bus = bus
-        self.silence_timeout = silence_timeout
+        self.silence_timer = silence_timer
 
         self.stt = WhisperSTT()
         self.vad = SileroVAD()
@@ -50,17 +50,19 @@ class STTController:
 
         vad_audio = np.concatenate(self.frame_buffer)
         has_speech = self.vad.has_speech(vad_audio)
-
+        log(f"Event checker = {self.silence_timer._active_sources}, event triggered = {self.silence_timer._triggered}", role="PIPELINE", stage="record_frame")
         # 2. Есть речь
         if has_speech:
-            self.last_activity_ts = now
+            
             self.silence_counter = 0
             self.post_speech_counter = 0
 
             if not self.speech_active:
+                self.silence_timer.activity_start()
                 self.speech_active = True
                 self.speech_buffer = list(self.pre_speech_buffer)
                 self.bus.emit(Event("speech_start"))
+                
                 log("Speech started", role="PIPELINE", stage="VAD")
 
             self.speech_buffer.append(frame)
@@ -78,14 +80,7 @@ class STTController:
                     self._finalize_speech()
             return
 
-        # 4. Полная тишина
-        if now - self.last_activity_ts >= self.silence_timeout:
-            self.bus.emit(Event("silence_timeout", {
-                "duration": int(now - self.last_activity_ts)
-            }))
-            self.last_activity_ts = now
-
-
+        
     def _finalize_speech(self):
         audio = np.concatenate(self.speech_buffer)
 
@@ -94,7 +89,7 @@ class STTController:
         self.silence_counter = 0
         self.post_speech_counter = 0
 
-        self.last_activity_ts = time.time()
+        self.silence_timer.activity_end()
 
         log("Speech finalized", role="PIPELINE", stage="STT")
 
@@ -105,6 +100,7 @@ class STTController:
                 self.bus.emit(Event("user_text", {"text": text}))
         except Exception as e:
             self.bus.emit(Event("stt_error", {"error": str(e)}))
+
 
 
 async def stt_loop(stt: STTController):

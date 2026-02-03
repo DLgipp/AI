@@ -7,11 +7,14 @@ from modules.memory.message_store import SQLiteMessageStore
 from modules.memory.session_state import SQLiteSessionStateStore
 import time
 
+from modules.events.timers import SilenceTimer
+
 message_store = SQLiteMessageStore()
 session_state = SQLiteSessionStateStore()
 SESSION_ID = "default"
 
-def _generate_response_blocking(user_input, history: list):
+def _generate_response_blocking(user_input, history: list, silence_timer: SilenceTimer):
+    silence_timer.activity_start()
     """Оригинальная синхронная генерация ответа."""
     try:
         recent_history = message_store.load_recent(session_id=SESSION_ID, limit=MAX_HISTORY)
@@ -57,8 +60,10 @@ def _generate_response_blocking(user_input, history: list):
     except Exception as e:
         log(f"LLM error: {e}", role="ERROR", stage="LLM")
         return "[LLM ERROR]"
+    finally:
+        silence_timer.activity_end()
 
-async def generate_response_async(user_input, history: list):
+async def generate_response_async(user_input, history: list, silence_timer):
     """Асинхронная обёртка для LLM."""
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _generate_response_blocking, user_input, history)
+    return await loop.run_in_executor(None, _generate_response_blocking, user_input, history, silence_timer)
