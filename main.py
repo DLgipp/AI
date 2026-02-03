@@ -1,41 +1,59 @@
-from modules.core.dialog_core import DialogueCore
+import time
 
-from modules.stt.runner import run_stt_loop
+from modules.core.dialog_core import DialogueCore
 from modules.llm.ollama_client import generate_response
 from modules.tts.tts import speak
 
+from modules.events.event_bus import EventBus
+from modules.events.policy import ReactivePolicy
+from modules.stt.controller import STTController
+
 
 def main():
+    # =========================
+    # ИНФРАСТРУКТУРА
+    # =========================
+    bus = EventBus()
+
     dialog = DialogueCore(history_size=10)
+    policy = ReactivePolicy(dialog)
 
-    while True:
+    stt = STTController(bus)
 
-        
-        if dialog.is_speaking():
-            continue
+    # =========================
+    # EVENT HANDLERS
+    # =========================
+    def on_user_text(event):
+        text = event.payload["text"]
 
-        user_text = run_stt_loop()
-        if not user_text:
-            continue
-
-        dialog.push_user_message(user_text)
+        dialog.push_user_message(text)
 
         msg = dialog.pop_next()
-        if msg["role"] != "user":
-            continue
+        if msg and msg["role"] == "user":
+            response = generate_response(
+                msg["text"],
+                dialog.get_history()
+            )
+            dialog.push_assistant_message(response)
 
-        response = generate_response(msg["text"], dialog.get_history())
-        dialog.push_assistant_message(response)
+    bus.subscribe("user_text", on_user_text)
+    bus.subscribe("silence_timeout", policy.handle_event)
 
+    # =========================
+    # MAIN LOOP
+    # =========================
+    while True:
+        # STT работает всегда
+        stt.tick()
+
+        # Ассистент говорит, если может
         assistant_msg = dialog.pop_next()
-        if assistant_msg and dialog.can_speak():
+        if assistant_msg and assistant_msg["role"] == "assistant" and dialog.can_speak():
             dialog.set_speaking()
-
-            print("AI:", assistant_msg["text"])
-            speak(assistant_msg["text"])  # ⬅ блокирующий вызов
-
+            speak(assistant_msg["text"])  # блокирующий TTS
             dialog.set_listening()
 
+        time.sleep(0.02)
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ import time
 from modules.stt.logger import log  # используем уже готовый модуль логов
 
 VOICE_ID = r'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Speech\Voices\Tokens\TTS_MS_RU-RU_IRINA_11.0'
-RATE = 150
+RATE = 200
 VOLUME = 1.0
 
 def speak(text: str):
