@@ -30,3 +30,5 @@ MARIN_PERSONA = {
 }
 
 MEMORY_DB_PATH = "data/memory.db"
+
+SILENCE_TIMEOUT_SEC = 1500.0

@@ -6,8 +6,8 @@ class WhisperSTT:
     def __init__(self):
         self.model = WhisperModel(
             WHISPER_MODEL,
-            device="cuda",
-            compute_type="float16"
+            device="cpu",
+            compute_type="int8"
         )
         log("Whisper model initialized", role="SYSTEM", stage="WhisperSTT")
 

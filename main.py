@@ -9,6 +9,8 @@ from modules.stt.controller import STTController
 
 from modules.events.timers import SilenceTimer
 
+from config import SILENCE_TIMEOUT_SEC
+
 async def stt_loop(stt: STTController, loop):
     #loop = asyncio.get_event_loop()
     """Постоянный цикл STT."""
@@ -21,13 +23,13 @@ async def silence_loop(silence_timer: SilenceTimer):
         silence_timer.tick()
         await asyncio.sleep(0.1)
 
-async def tts_loop(dialog: DialogueCore, silence_timer: SilenceTimer):
+async def tts_loop(dialog: DialogueCore, silence_timer: SilenceTimer, loop=None):
     """Цикл, отвечающий за произнесение ассистента."""
     while True:
         assistant_msg = dialog.pop_next()
         if assistant_msg and assistant_msg["role"] == "assistant" and dialog.can_speak():
             dialog.set_speaking()
-            await speak_async(assistant_msg["text"], silence_timer)  # async TTS
+            await speak_async(assistant_msg["text"], silence_timer, loop=loop)  # async TTS
             dialog.set_listening()
         await asyncio.sleep(0.02)
 
@@ -50,7 +52,7 @@ async def main():
     # =========================
     loop = asyncio.get_running_loop()  # главный loop
     bus = EventBus(loop)
-    silence_timer = SilenceTimer(bus, timeout_sec=15.0)
+    silence_timer = SilenceTimer(bus, timeout_sec=SILENCE_TIMEOUT_SEC)
     dialog = DialogueCore(history_size=10, )
     policy = ReactivePolicy(dialog, cooldown_sec=13.0)
     stt = STTController(bus, silence_timer)
@@ -73,7 +75,7 @@ async def main():
     # =========================
     await asyncio.gather(
         stt_loop(stt, loop),
-        tts_loop(dialog, silence_timer),
+        tts_loop(dialog, silence_timer, loop),
         silence_loop(silence_timer),
     )
 

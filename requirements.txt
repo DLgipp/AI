@@ -5,3 +5,13 @@ opencv-python      # работа с экраном/камерой
 pynput             # события клавиатуры и мыши
 python-dotenv      # для переменных окружения
 ollama
+
+qwen-tts
+numpy
+sounddevice
+soundfile
+
+-f https://download.pytorch.org/whl/cu121/torch_stable.html
+torch==2.2.0+cu121
+torchaudio==2.2.0+cu121
+torchvision==0.17.0+cu121
