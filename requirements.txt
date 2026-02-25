@@ -1,17 +1,52 @@
+# =========================
+# CORE DEPENDENCIES
+# =========================
 pyttsx3            # TTS
 SpeechRecognition  # STT
 pyaudio            # для микрофона
 opencv-python      # работа с экраном/камерой
 pynput             # события клавиатуры и мыши
 python-dotenv      # для переменных окружения
-ollama
+ollama             # LLM client
 
+# =========================
+# AUDIO / TTS
+# =========================
 qwen-tts
-numpy
+numpy==1.26.4
 sounddevice
 soundfile
 
+# =========================
+# ML / DEEP LEARNING
+# =========================
 -f https://download.pytorch.org/whl/cu121/torch_stable.html
 torch==2.2.0+cu121
 torchaudio==2.2.0+cu121
 torchvision==0.17.0+cu121
+
+# =========================
+# DATABASE / MEMORY
+# =========================
+# SQLite is built-in, for PostgreSQL support add:
+psycopg2-binary
+sqlalchemy
+
+# For Vector DB (optional - for production semantic memory):
+pymilvus
+weaviate-client
+
+# For Graph DB (optional - for production relational memory):
+neo4j
+
+# =========================
+# OPTIONAL ENHANCEMENTS
+# =========================
+# For better emotion detection:
+transformers  # BERT-based models
+sentence-transformers  # Better embeddings
+
+# For advanced NLP:
+nltk
+spacy
+rusentiment  # Russian sentiment analysis
