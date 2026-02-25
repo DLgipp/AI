@@ -29,7 +29,7 @@ async def tts_loop(dialog: DialogueCore, silence_timer: SilenceTimer, loop=None)
         assistant_msg = dialog.pop_next()
         if assistant_msg and assistant_msg["role"] == "assistant" and dialog.can_speak():
             dialog.set_speaking()
-            await speak_async(assistant_msg["text"], silence_timer, loop=loop)  # async TTS
+            await speak_async(assistant_msg["text"], silence_timer)  # async TTS
             dialog.set_listening()
         await asyncio.sleep(0.02)
 

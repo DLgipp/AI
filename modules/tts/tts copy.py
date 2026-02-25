@@ -13,22 +13,18 @@ import threading
 import queue
 
 
+
 audio_queue = queue.Queue(maxsize=4)
-language = 'ru'
-model_id = 'v5_ru'
-device = torch.device('cuda')
-model, example_text = torch.hub.load(repo_or_dir='snakers4/silero-models',
-                                     model='silero_tts',
-                                     language=language,
-                                     speaker=model_id)
-model.to(device)  # gpu or cpu
-sample_rate = 48000
-speaker = 'xenia'
-put_accent=True
-put_yo=True
-put_stress_homo=True
-put_yo_homo=True
 stop_event = threading.Event()
+
+ref_audio = "./modules/tts/origin1.wav"
+ref_text = "Да пофиг, что он - красавчик! Я таких не перевариваю. Видно же что я фанатка, рас повесила брелок на сумку! По вашему нормально вот так смеятся над чужими увлечениями?"
+
+model = Qwen3TTSModel.from_pretrained(
+    "Qwen/Qwen3-TTS-12Hz-1.7B-Base",
+    device_map="cuda:0",
+    dtype=torch.bfloat16,
+)
 
 # Глобальный поток вывода
 audio_stream = None
@@ -55,13 +51,14 @@ def generate_worker(text: str):
     sentences = re.split(r'(?<=[.!?])\s+', text)
 
     for sentence in sentences:
-        if not sentence or len(sentence) < 2:
-            continue
-        audio = model.apply_tts(text=sentence,
-                        speaker=speaker,
-                        sample_rate=sample_rate)
+        wavs, sr = model.generate_voice_clone(
+            text=sentence,
+            language="Russian",
+            ref_audio=ref_audio,
+            ref_text=ref_text,
+        )
 
-        audio = np.array(audio, dtype=np.float32)
+        audio = np.array(wavs[0], dtype=np.float32)
 
         audio_queue.put(audio)
 
@@ -78,8 +75,16 @@ def _speak_blocking(text: str, silence_timer: SilenceTimer):
         gen_thread = threading.Thread(target=generate_worker, args=(text,))
         gen_thread.start()
 
+        # Ждём первый кусок, чтобы узнать sample rate
+        wavs, sr = model.generate_voice_clone(
+            text=".",
+            language="Russian",
+            ref_audio=ref_audio,
+            ref_text=ref_text,
+        )
+
         # Запускаем плеер
-        player_thread = threading.Thread(target=audio_worker, args=(sample_rate,))
+        player_thread = threading.Thread(target=audio_worker, args=(sr,))
         player_thread.start()
 
         gen_thread.join()

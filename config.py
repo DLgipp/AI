@@ -5,18 +5,18 @@ FRAME_DURATION = 0.2
 VAD_WINDOW_SECONDS = 0.5        # секунд
 MAX_SPEECH_DURATION = 15.0  # защита от зависания
 
-WHISPER_MODEL = "large-v2"
+WHISPER_MODEL = "large-v3-turbo"
 WHISPER_LANGUAGE = "ru"
 
 SYSTEM_PROMPT = "You are a deterministic assistant. Answer shortly and concisely."
-MODEL_NAME = "llama3.1"
+MODEL_NAME = 'gpt-oss:120b-cloud'
 MAX_TOKENS = 150
 MAX_HISTORY = 10
 
 MIC_DEVICE_INDEX = 3
 
 MARIN_PERSONA = {
-    "name": "Марин",
+    "name": "Акари",
     "role": "игривая и эмоциональная спутница, которая любит шутить и поддерживать разговор",
     "style": "разговорный, игривый, эмоциональный, слегка саркастичный, дружелюбный",
     "speech_markers": ["эх…", "ну…", "ой!", "ха-ха", "ммм…", "не так ли?", "однако"],
