@@ -1,22 +1,36 @@
 """
 Memory Layer - Main module providing unified access to all memory systems.
+
+Production Configuration:
+- Episodic Memory: PostgreSQL
+- Semantic Memory: Milvus (Vector DB)
+- Relational Memory: Neo4j (Graph DB)
+- Personality Memory: PostgreSQL
 """
 
-from modules.memory.episodic_memory import EpisodicMemoryStore, EpisodicMemory
-from modules.memory.semantic_memory import SemanticMemoryStore, SemanticMemory
-from modules.memory.relational_memory import RelationalMemoryStore, Entity, Relation
-from modules.memory.personality_memory import PersonalityMemoryStore, PersonalityState
+from modules.memory.episodic_memory import EpisodicMemoryStore, EpisodicMemory, PostgreSQLEpisodicMemoryStore
+from modules.memory.semantic_memory import SemanticMemoryStore, SemanticMemory, MilvusSemanticMemoryStore
+from modules.memory.relational_memory import RelationalMemoryStore, Entity, Relation, Neo4jRelationalMemoryStore
+from modules.memory.personality_memory import PersonalityState, PostgreSQLPersonalityMemoryStore
 
 __all__ = [
+    # Episodic
     "EpisodicMemoryStore",
     "EpisodicMemory",
+    "PostgreSQLEpisodicMemoryStore",
+    # Semantic
     "SemanticMemoryStore",
     "SemanticMemory",
+    "MilvusSemanticMemoryStore",
+    # Relational
     "RelationalMemoryStore",
     "Entity",
     "Relation",
-    "PersonalityMemoryStore",
+    "Neo4jRelationalMemoryStore",
+    # Personality
     "PersonalityState",
+    "PostgreSQLPersonalityMemoryStore",
+    # Main
     "MemoryLayer"
 ]
 
@@ -24,25 +38,76 @@ __all__ = [
 class MemoryLayer:
     """
     Unified Memory Layer that provides access to all memory systems.
-    
-    Coordinates between:
-    - Episodic Memory (events, experiences)
-    - Semantic Memory (knowledge, concepts)
-    - Relational Memory (relationships, graph)
-    - Personality Memory (traits, values, state)
+
+    Production Configuration:
+    - Episodic Memory: PostgreSQL (events, experiences)
+    - Semantic Memory: Milvus Vector DB (knowledge, concepts)
+    - Relational Memory: Neo4j Graph DB (relationships, graph)
+    - Personality Memory: PostgreSQL (traits, values, state)
+
+    Coordinates between all memory systems for complete experience storage.
     """
-    
+
     def __init__(
         self,
+        use_production_dbs: bool = True,
+        episodic_db_url: str = None,
+        personality_db_url: str = None,
+        milvus_host: str = None,
+        milvus_port: int = None,
+        neo4j_uri: str = None,
+        # Legacy SQLite paths for fallback
         episodic_path: str = "data/episodic_memory.db",
         semantic_path: str = "data/semantic_memory.db",
         relational_path: str = "data/relational_memory.db",
         personality_path: str = "data/personality_memory.db"
     ):
-        self.episodic = EpisodicMemoryStore(episodic_path)
-        self.semantic = SemanticMemoryStore(semantic_path)
-        self.relational = RelationalMemoryStore(relational_path)
-        self.personality = PersonalityMemoryStore(personality_path)
+        """
+        Initialize Memory Layer.
+
+        Args:
+            use_production_dbs: If True, use PostgreSQL/Milvus/Neo4j. If False, use SQLite.
+            episodic_db_url: PostgreSQL URL for episodic memory
+            personality_db_url: PostgreSQL URL for personality memory
+            milvus_host: Milvus server host
+            milvus_port: Milvus server port
+            neo4j_uri: Neo4j connection URI
+            episodic_path: SQLite path (fallback)
+            semantic_path: SQLite path (fallback)
+            relational_path: SQLite path (fallback)
+            personality_path: SQLite path (fallback)
+        """
+        from config import (
+            EPISODIC_DB_URL as CFG_EPISODIC_URL,
+            PERSONALITY_DB_URL as CFG_PERSONALITY_URL,
+            MILVUS_HOST as CFG_MILVUS_HOST,
+            MILVUS_PORT as CFG_MILVUS_PORT,
+            NEO4J_URI as CFG_NEO4J_URI
+        )
+
+        if use_production_dbs:
+            # Use production databases
+            self.episodic = PostgreSQLEpisodicMemoryStore(
+                db_url=episodic_db_url or CFG_EPISODIC_URL
+            )
+            self.semantic = MilvusSemanticMemoryStore(
+                host=milvus_host or CFG_MILVUS_HOST,
+                port=milvus_port or CFG_MILVUS_PORT
+            )
+            self.relational = Neo4jRelationalMemoryStore(
+                uri=neo4j_uri or CFG_NEO4J_URI
+            )
+            self.personality = PostgreSQLPersonalityMemoryStore(
+                db_url=personality_db_url or CFG_PERSONALITY_URL
+            )
+            self._use_production = True
+        else:
+            # Use SQLite (fallback for development/debugging)
+            self.episodic = EpisodicMemoryStore(episodic_path)
+            self.semantic = SemanticMemoryStore(semantic_path)
+            self.relational = RelationalMemoryStore(relational_path)
+            self.personality = PersonalityMemoryStore(personality_path)
+            self._use_production = False
     
     def store_experience(
         self,
@@ -255,5 +320,13 @@ class MemoryLayer:
             "episodic": self.episodic.get_statistics(),
             "semantic": self.semantic.get_statistics(),
             "relational": self.relational.get_statistics(),
-            "personality": self.personality.get_statistics()
+            "personality": self._get_personality_statistics()
         }
+
+    def _get_personality_statistics(self) -> dict:
+        """Get personality statistics formatted for display."""
+        stats = self.personality.get_statistics()
+        # Convert top_values list to string for Rich compatibility
+        if isinstance(stats.get('top_values'), list):
+            stats['top_values'] = stats['top_values']  # Keep as list, will be formatted in display
+        return stats

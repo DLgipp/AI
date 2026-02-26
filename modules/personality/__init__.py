@@ -3,13 +3,13 @@ Personality Module - Main module.
 """
 
 from modules.personality.personality_engine import PersonalityEngine, PersonalityStance
-from modules.memory.personality_memory import PersonalityState, PersonalityMemoryStore
+from modules.memory.personality_memory import PersonalityState, PostgreSQLPersonalityMemoryStore
 
 __all__ = [
     "PersonalityEngine",
     "PersonalityStance",
     "PersonalityState",
-    "PersonalityMemoryStore",
+    "PostgreSQLPersonalityMemoryStore",
     "PersonalityLayer"
 ]
 
@@ -17,16 +17,17 @@ __all__ = [
 class PersonalityLayer:
     """
     Unified Personality Layer that combines personality storage and engine.
-    
+
     Responsibilities:
     - Maintain personality state
     - Calculate stance for each situation
     - Update personality based on experiences
     - Provide value alignment information
     """
-    
-    def __init__(self, db_path: str = "data/personality_memory.db"):
-        self.memory = PersonalityMemoryStore(db_path)
+
+    def __init__(self, db_url: str = None):
+        from config import PERSONALITY_DB_URL
+        self.memory = PostgreSQLPersonalityMemoryStore(db_url=db_url or PERSONALITY_DB_URL)
         self.engine = None  # Initialized after loading state
         self._load_state()
     

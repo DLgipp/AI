@@ -28,25 +28,35 @@ torchvision==0.17.0+cu121
 # =========================
 # DATABASE / MEMORY
 # =========================
-# SQLite is built-in, for PostgreSQL support add:
-psycopg2-binary
-sqlalchemy
 
-# For Vector DB (optional - for production semantic memory):
-pymilvus
-weaviate-client
+# PostgreSQL - основной реляционный存储
+psycopg2-binary>=2.9.9
+sqlalchemy>=2.0.0
+asyncpg>=0.29.0          # Асинхронный PostgreSQL драйвер
 
-# For Graph DB (optional - for production relational memory):
-neo4j
+# Vector DB - Milvus для семантической памяти
+pymilvus>=2.3.0
+
+# Graph DB - Neo4j для реляционной памяти
+neo4j>=5.15.0
+
+# SQLite (встроенный, для отладки)
 
 # =========================
 # OPTIONAL ENHANCEMENTS
 # =========================
 # For better emotion detection:
 transformers  # BERT-based models
-sentence-transformers  # Better embeddings
+
+# For embeddings (required for semantic memory):
+sentence-transformers>=2.2.2  # 768-dim embeddings
 
 # For advanced NLP:
 nltk
 spacy
 rusentiment  # Russian sentiment analysis
+
+# =========================
+# VTUBE STUDIO
+# =========================
+websockets>=10.0  # VTube Studio API
