@@ -16,7 +16,10 @@ class WhisperSTT:
         segments, _ = self.model.transcribe(
             audio,
             language=WHISPER_LANGUAGE,
-            beam_size=5
+            beam_size=7,
+            condition_on_previous_text=True,
+            vad_filter=False,
+            temperature=0
         )
 
         text = []

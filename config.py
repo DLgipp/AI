@@ -8,7 +8,7 @@ FRAME_DURATION = 0.2
 VAD_WINDOW_SECONDS = 0.5        # секунд
 MAX_SPEECH_DURATION = 15.0  # защита от зависания
 
-WHISPER_MODEL = "large-v3-turbo"
+WHISPER_MODEL = "large-v3"
 WHISPER_LANGUAGE = "ru"
 
 MIC_DEVICE_INDEX = 3
