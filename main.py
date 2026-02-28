@@ -58,12 +58,22 @@ async def silence_loop(silence_timer: SilenceTimer):
 
 
 async def tts_loop(dialog: DialogueCore, silence_timer: SilenceTimer, loop=None):
-    """Цикл произнесения ответов ассистента."""
+    """Цикл произнесения ответов ассистента с выразительностью."""
     while True:
         assistant_msg = dialog.pop_next()
         if assistant_msg and assistant_msg["role"] == "assistant" and dialog.can_speak():
             dialog.set_speaking()
-            await speak_async(assistant_msg["text"], silence_timer)
+            
+            # Получаем контекст выразительности из сообщения
+            tts_context = assistant_msg.get("tts_context")
+            
+            if tts_context:
+                from modules.tts.tts_expression import ExpressionContext
+                context = ExpressionContext(**tts_context)
+                await speak_async(assistant_msg["text"], silence_timer, context)
+            else:
+                await speak_async(assistant_msg["text"], silence_timer)
+            
             dialog.set_listening()
         await asyncio.sleep(0.02)
 
@@ -112,17 +122,22 @@ async def generate_llm_response(
         silence_timer.activity_start()
         response = llm_service.generate(request)
         silence_timer.activity_end()
-        
+
         # Проверка ответа
         log(f"LLM response type: {type(response)}",
             role="DEBUG", stage="LLM")
         log(f"LLM content length: {len(response.content)}",
             role="DEBUG", stage="LLM")
-        
+
+        # Логирование thinking контента если есть
+        if response.thinking:
+            log(f"LLM thinking: {response.thinking}",
+                role="DEBUG", stage="LLM")
+
         if response.error:
             log(f"LLM error from service: {response.error}",
                 role="ERROR", stage="LLM")
-        
+
         return response.content
 
     except Exception as e:
@@ -202,15 +217,18 @@ async def llm_handler(event, dialog: DialogueCore, silence_timer: SilenceTimer):
             llm_response=llm_response,
             pipeline_result=result
         )
-        
+
         final_text = output["text"]
         adjustments = output.get("style_adjustments", {})
-        
+        tts_context = output.get("tts_context")
+
         log(f"Behavior adjustments: {adjustments}", role="PIPELINE", stage="BEHAVIOR")
-        
+
         # ========== ШАГ 4: Сохранение в диалог и память ==========
         dialog.push_user_message(text)
-        dialog.push_assistant_message(final_text)
+        
+        # Сохраняем сообщение с контекстом для TTS
+        dialog.push_assistant_message(final_text, metadata={"tts_context": tts_context})
         
         log(f"Response pushed to dialog: {final_text}...", role="ASSISTANT", stage="COMPLETE")
         

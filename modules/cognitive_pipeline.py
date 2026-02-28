@@ -183,45 +183,96 @@ class CognitivePipeline:
             pipeline_result: Result from process() call
 
         Returns:
-            Processed response with metadata
+            Processed response with metadata and TTS context
         """
         # Логирование входящего ответа
         from modules.stt.logger import log
         log(f"process_llm_response: input len={len(llm_response)}, preview={llm_response[:100]}...",
             role="DEBUG", stage="BEHAVIOR")
-        
+
         # Get decision and stance from pipeline result
         decision_dict = pipeline_result.get("decision", {})
         stance = pipeline_result.get("stance", {})
-        
+        interpretation = pipeline_result.get("interpretation", {})
+
         # Reconstruct DecisionVector (simplified)
         decision = self._reconstruct_decision(decision_dict)
-        
+
         # Process through behavior layer
         behavior_output = self.behavior.process(
             llm_output=llm_response,
             decision=decision,
             stance=stance
         )
-        
+
         # Логирование исходящего ответа
         log(f"process_llm_response: output len={len(behavior_output.text)}, preview={behavior_output.text[:100]}...",
             role="DEBUG", stage="BEHAVIOR")
-        
+
         # Store assistant response in memory
         self.memory.store_experience(
             session_id=self.session_id,
             event_type="assistant_message",
             content=llm_response,  # Сохраняем оригинальный LLM ответ
-            interpretation=pipeline_result.get("interpretation", {}),
+            interpretation=interpretation,
             metadata={"behavior_adjustments": behavior_output.style_adjustments}
         )
-        
+
+        # Create TTS expression context
+        tts_context = self._create_tts_context(
+            decision=decision,
+            stance=stance,
+            interpretation=interpretation
+        )
+
         return {
             "text": behavior_output.text,
             "adjustments": behavior_output.style_adjustments,
-            "metadata": behavior_output.metadata
+            "metadata": behavior_output.metadata,
+            "tts_context": tts_context
         }
+
+    def _create_tts_context(
+        self,
+        decision: Any,
+        stance: Dict[str, Any],
+        interpretation: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Create TTS expression context from pipeline data.
+        
+        Args:
+            decision: Decision vector
+            stance: Personality stance
+            interpretation: Interpretation output
+            
+        Returns:
+            Dictionary with TTS context data
+        """
+        from modules.tts.tts_expression import ExpressionContext
+        
+        # Extract emotion from interpretation
+        user_emotion = interpretation.get("user_emotion", {})
+        emotion_full = interpretation.get("emotion_full", {})
+        
+        # Map decision strategy to TTS context
+        decision_strategy = decision.strategy.name if hasattr(decision, 'strategy') else "ANSWER_DIRECT"
+        emotional_tone = decision.emotional_tone.name if hasattr(decision, 'emotional_tone') else "NEUTRAL"
+        
+        # Get dominant trait from stance
+        dominant_trait = stance.get("dominant_trait", "neutral")
+        engagement_level = stance.get("engagement_level", 0.5)
+        
+        context = ExpressionContext(
+            emotion=emotion_full,
+            emotional_tone=emotional_tone,
+            decision_strategy=decision_strategy,
+            dominant_trait=dominant_trait,
+            engagement_level=engagement_level,
+            user_emotion=user_emotion
+        )
+        
+        return context.to_dict()
     
     def process_user_feedback(
         self,

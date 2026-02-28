@@ -36,16 +36,17 @@ class LLMResponse:
     model: str = ""
     error: Optional[str] = None
     metadata: Dict[str, Any] = None
-    
+    thinking: Optional[str] = None  # Thinking/reasoning content for debugging
+
     def __post_init__(self):
         if self.metadata is None:
             self.metadata = {}
-    
+
     @property
     def success(self) -> bool:
         """Успешен ли запрос."""
         return self.error is None and len(self.content) > 0
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "content": self.content,
@@ -54,7 +55,8 @@ class LLMResponse:
             "model": self.model,
             "error": self.error,
             "success": self.success,
-            "metadata": self.metadata
+            "metadata": self.metadata,
+            "thinking": self.thinking
         }
 
 
@@ -180,21 +182,43 @@ class LLMService:
             elif isinstance(response, dict):
                 tokens = response.get("eval_count", 0)
 
+            # Извлечение thinking/reasoning content (для thinking моделей)
+            thinking = None
+            if hasattr(response, 'message'):
+                msg = response.message
+                # Проверяем наличие thinking/reasoning поля
+                if hasattr(msg, 'thinking'):
+                    thinking = msg.thinking
+                    log(f"DEBUG: thinking found, len={len(thinking) if thinking else 0}", 
+                        role="DEBUG", stage="LLM")
+                elif hasattr(msg, 'reasoning_content'):
+                    thinking = msg.reasoning_content
+                    log(f"DEBUG: reasoning_content found, len={len(thinking) if thinking else 0}", 
+                        role="DEBUG", stage="LLM")
+                elif isinstance(msg, dict):
+                    thinking = msg.get('thinking') or msg.get('reasoning_content')
+
             log(f"LLM response: {latency_ms:.1f} ms, {len(content)} chars, {tokens} tokens",
                 role="PIPELINE", stage="LLM")
-            
+
+            if thinking:
+                log(f"LLM thinking: {thinking[:200]}..." if len(thinking) > 200 
+                    else f"LLM thinking: {thinking}",
+                    role="DEBUG", stage="LLM")
+
             if not content:
                 log("WARNING: Empty content from LLM!", role="WARN", stage="LLM")
                 # Дополнительная отладка
                 if hasattr(response, 'message'):
                     log(f"DEBUG: message type={type(response.message)}, dir={dir(response.message)[:5]}",
                         role="DEBUG", stage="LLM")
-            
+
             return LLMResponse(
                 content=content,
                 latency_ms=latency_ms,
                 tokens=tokens,
                 model=self.model_name,
+                thinking=thinking,
                 metadata={
                     "messages_count": len(messages),
                     "system_prompt_length": len(request.system_prompt),
