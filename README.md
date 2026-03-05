@@ -40,6 +40,15 @@
 
 ## ✨ Что было реализовано
 
+### 0. Discord Integration (Discord)
+**Файлы:** `modules/discord/`
+
+- ✅ **DiscordVoiceClient** — подключение к голосовым каналам Discord
+- ✅ **TTSAudioSource** — потоковая передача TTS аудио
+- ✅ **Выразительная речь** — поддержка SSML для эмоциональной окраски
+- ✅ **Очередь воспроизведения** — последовательное воспроизведение сообщений
+- ✅ **Авто-переподключение** — восстановление соединения при разрыве
+
 ### 1. Perception Layer (Восприятие)
 **Файлы:** `modules/perception/`
 
@@ -256,6 +265,11 @@ async def llm_handler(event, dialog, silence_timer, cognitive_pipeline):
 ```
 c:\AI\
 ├── modules/
+│   ├── discord/              # Discord voice integration
+│   │   ├── voice_client.py
+│   │   ├── __init__.py
+│   │   ├── example.py
+│   │   └── README.md
 │   ├── perception/           # Уровень 1: Восприятие
 │   │   ├── input_normalizer.py
 │   │   ├── emotion_detector.py

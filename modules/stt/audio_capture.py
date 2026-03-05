@@ -9,7 +9,8 @@ def record_frame() -> np.ndarray:
         frames,
         samplerate=SAMPLE_RATE,
         channels=CHANNELS,
-        dtype="float32"
+        dtype="float32",
+        device=2
     )
     sd.wait()
     #log("Frame recorded", role="PIPELINE", stage="record_frame", payload=f"{len(audio)} samples")

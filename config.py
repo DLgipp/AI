@@ -176,6 +176,17 @@ REWARD_WEIGHTS = {
 }
 
 # =========================
+# DISCORD VOICE CONFIGURATION
+# =========================
+DISCORD_ENABLED = True
+DISCORD_BOT_TOKEN = ""  # Set your bot token here or use environment variable
+DISCORD_GUILD_ID =     # Server ID (replace with actual ID)
+DISCORD_VOICE_CHANNEL_ID =   # Voice channel ID (replace with actual ID)
+DISCORD_DEFAULT_VOLUME = 1.0  # Volume: 0.0 to 2.0
+DISCORD_AUTO_RECONNECT = True  # Auto-reconnect on disconnect
+DISCORD_USE_SSML = True  # Use SSML for expressive speech
+
+# =========================
 # SESSION CONFIGURATION
 # =========================
 DEFAULT_SESSION_ID = "default"

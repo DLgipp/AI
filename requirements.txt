@@ -60,3 +60,11 @@ rusentiment  # Russian sentiment analysis
 # VTUBE STUDIO
 # =========================
 websockets>=10.0  # VTube Studio API
+
+# =========================
+# DISCORD VOICE INTEGRATION
+# =========================
+discord.py>=2.3.0
+discord.py[voice]>=2.3.0  # Voice support (PyNaCl)
+PyNaCl>=1.5.0             # Audio encoding for Discord
+scipy>=1.10.0             # Audio resampling

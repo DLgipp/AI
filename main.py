@@ -1,5 +1,5 @@
 """
-Main.py - Интегрированная версия с когнитивным пайплайном
+Main.py - Интегрированная версия с когнитивным пайплайном и Discord
 
 Эта версия использует полную архитектуру эволюционирующего ИИ-ассистента:
 - Perception Layer (восприятие)
@@ -10,6 +10,7 @@ Main.py - Интегрированная версия с когнитивным 
 - Prompt Builder (промпты)
 - Behavior Layer (поведение)
 - Evolution Layer (эволюция/RL)
+- Discord Voice Integration (вывод TTS в Discord)
 """
 
 import asyncio
@@ -27,13 +28,23 @@ from modules.events.timers import SilenceTimer
 # Импорты когнитивного пайплайна
 from modules.cognitive_pipeline import CognitivePipeline
 from modules.llm.llm_service import LLMService, LLMRequest, get_llm_service
+
+# Discord импорты
+from modules.discord import DiscordVoiceClient
 from config import (
     SILENCE_TIMEOUT_SEC,
     MODEL_NAME,
     MAX_TOKENS,
     ASSISTANT_NAME,
     DEFAULT_SESSION_ID,
-    DEFAULT_USER_ID
+    DEFAULT_USER_ID,
+    # Discord конфигурация
+    DISCORD_ENABLED,
+    DISCORD_BOT_TOKEN,
+    DISCORD_GUILD_ID,
+    DISCORD_VOICE_CHANNEL_ID,
+    DISCORD_DEFAULT_VOLUME,
+    DISCORD_AUTO_RECONNECT,
 )
 
 # Глобальные объекты
@@ -41,6 +52,7 @@ cognitive_pipeline: Optional[CognitivePipeline] = None
 dialog: Optional[DialogueCore] = None
 silence_timer: Optional[SilenceTimer] = None
 llm_service: Optional[LLMService] = None
+discord_client: Optional[DiscordVoiceClient] = None
 
 
 async def stt_loop(stt: STTController, loop):
@@ -57,23 +69,37 @@ async def silence_loop(silence_timer: SilenceTimer):
         await asyncio.sleep(0.1)
 
 
-async def tts_loop(dialog: DialogueCore, silence_timer: SilenceTimer, loop=None):
-    """Цикл произнесения ответов ассистента с выразительностью."""
+async def tts_loop(dialog: DialogueCore, silence_timer: SilenceTimer, discord_client: Optional[DiscordVoiceClient] = None, loop=None):
+    """
+    Цикл произнесения ответов ассистента с выразительностью.
+
+    Аудио поток из TTS автоматически транслируется в Discord
+    через callback, установленный в audio_worker.
+    """
     while True:
         assistant_msg = dialog.pop_next()
         if assistant_msg and assistant_msg["role"] == "assistant" and dialog.can_speak():
             dialog.set_speaking()
-            
+
             # Получаем контекст выразительности из сообщения
             tts_context = assistant_msg.get("tts_context")
-            
+            text = assistant_msg["text"]
+
+            # Создаём контекст для выразительной речи
+            context = None
             if tts_context:
                 from modules.tts.tts_expression import ExpressionContext
                 context = ExpressionContext(**tts_context)
-                await speak_async(assistant_msg["text"], silence_timer, context)
-            else:
-                await speak_async(assistant_msg["text"], silence_timer)
+
+            # Локальный TTS (аудио автоматически отправляется в Discord через callback)
+            from modules.stt.logger import log
+            log(f"TTS: {text[:50]}...", role="TTS", stage="LOCAL")
             
+            if context:
+                await speak_async(text, silence_timer, context)
+            else:
+                await speak_async(text, silence_timer)
+
             dialog.set_listening()
         await asyncio.sleep(0.02)
 
@@ -296,7 +322,7 @@ async def main():
     """
     Основная функция запуска ассистента.
     """
-    global cognitive_pipeline, dialog, silence_timer, llm_service
+    global cognitive_pipeline, dialog, silence_timer, llm_service, discord_client
 
     # =========================
     # ИНФРАСТРУКТУРА
@@ -307,14 +333,61 @@ async def main():
     dialog = DialogueCore(history_size=10)
     policy = ReactivePolicy(dialog, cooldown_sec=13.0)
     stt = STTController(bus, silence_timer)
-    
+
     # =========================
     # LLM SERVICE
     # =========================
     llm_service = get_llm_service()
     from modules.stt.logger import log
-    log(f"LLM Service initialized: {llm_service.model_name}", 
+    log(f"LLM Service initialized: {llm_service.model_name}",
         role="SYSTEM", stage="INIT")
+
+    # =========================
+    # DISCORD VOICE CLIENT
+    # =========================
+    if DISCORD_ENABLED and DISCORD_BOT_TOKEN:
+        try:
+            log("Initializing Discord voice client...", role="SYSTEM", stage="DISCORD_INIT")
+
+            discord_client = DiscordVoiceClient(
+                token=DISCORD_BOT_TOKEN,
+                guild_id=DISCORD_GUILD_ID if DISCORD_GUILD_ID else None,
+                channel_id=DISCORD_VOICE_CHANNEL_ID if DISCORD_VOICE_CHANNEL_ID else None,
+                volume=DISCORD_DEFAULT_VOLUME,
+                auto_reconnect=DISCORD_AUTO_RECONNECT
+            )
+
+            await discord_client.connect()
+
+            # Ждём пока Discord полностью подключится
+            await asyncio.sleep(2)
+
+            # Auto-join if channel configured
+            if DISCORD_GUILD_ID and DISCORD_VOICE_CHANNEL_ID:
+                success = await discord_client.join_voice_channel(
+                    DISCORD_GUILD_ID,
+                    DISCORD_VOICE_CHANNEL_ID
+                )
+                if success:
+                    log(f"Discord: Joined voice channel {DISCORD_VOICE_CHANNEL_ID}",
+                        role="SYSTEM", stage="DISCORD_READY")
+                    log("Discord: Audio streaming will auto-start on first TTS",
+                        role="SYSTEM", stage="DISCORD_READY")
+                else:
+                    log("Discord: Failed to join voice channel",
+                        role="WARN", stage="DISCORD")
+            else:
+                log("Discord: Connected but no channel configured",
+                    role="WARN", stage="DISCORD")
+
+        except Exception as e:
+            log(f"Discord initialization error: {e}", role="ERROR", stage="DISCORD")
+            import traceback
+            log(traceback.format_exc(), role="ERROR", stage="DISCORD")
+            discord_client = None
+    else:
+        log("Discord: Disabled or not configured", role="SYSTEM", stage="DISCORD")
+        discord_client = None
 
     # =========================
     # КОГНИТИВНЫЙ ПАЙПЛАЙН
@@ -324,26 +397,26 @@ async def main():
         user_id=DEFAULT_USER_ID,
         assistant_name=ASSISTANT_NAME
     )
-    
+
     # Инициализация личности из конфига
     from config import PERSONALITY_TRAITS, PERSONALITY_VALUES
-    
+
     state = cognitive_pipeline.personality.get_state()
-    
+
     # Применяем начальные черты из конфига
     for trait_name, value in PERSONALITY_TRAITS.items():
         cognitive_pipeline.personality.memory.update_trait(trait_name, value)
-    
+
     # Применяем ценности из конфига
     for value_name, weight in PERSONALITY_VALUES.items():
         state.update_value(value_name, weight)
     cognitive_pipeline.personality.memory.save_state(state)
-    
+
     from modules.stt.logger import log
-    log(f"Cognitive pipeline initialized. Assistant: {ASSISTANT_NAME}", 
+    log(f"Cognitive pipeline initialized. Assistant: {ASSISTANT_NAME}",
         role="SYSTEM", stage="INIT")
     log(f"Personality traits: {PERSONALITY_TRAITS}", role="SYSTEM", stage="INIT")
-    
+
     # =========================
     # EVENT HANDLERS
     # =========================
@@ -352,22 +425,22 @@ async def main():
         result = llm_handler(event, dialog, silence_timer)
         if asyncio.iscoroutine(result):
             loop.call_soon_threadsafe(asyncio.create_task, result)
-    
+
     def silence_handler(event):
         """Обработчик таймаута тишины."""
         # Можно добавить инициативные сообщения ассистента
         policy.handle_event(event)
-    
+
     bus.subscribe("user_text", user_text_handler)
     bus.subscribe("silence_timeout", silence_handler)
-    
+
     # =========================
     # СТАТИСТИКА ПРИ ЗАПУСКЕ
     # =========================
     stats = cognitive_pipeline.get_statistics()
-    log(f"Session: {stats['session_id']}, User: {stats['user_id']}", 
+    log(f"Session: {stats['session_id']}, User: {stats['user_id']}",
         role="SYSTEM", stage="READY")
-    
+
     # =========================
     # ЗАПУСК ПАРАЛЛЕЛЬНЫХ ЦИКЛОВ
     # =========================
@@ -376,13 +449,26 @@ async def main():
     print("="*60)
     print(f"Личность: {list(PERSONALITY_TRAITS.keys())}")
     print(f"Сессия: {DEFAULT_SESSION_ID}")
+    if discord_client and discord_client.is_connected():
+        print(f"🎙️  Discord: Подключен к каналу {DISCORD_VOICE_CHANNEL_ID}")
+    else:
+        print("🔇 Discord: Отключен или не настроен")
     print("="*60 + "\n")
-    
-    await asyncio.gather(
-        stt_loop(stt, loop),
-        tts_loop(dialog, silence_timer, loop),
-        silence_loop(silence_timer),
-    )
+
+    try:
+        await asyncio.gather(
+            stt_loop(stt, loop),
+            tts_loop(dialog, silence_timer, discord_client, loop),
+            silence_loop(silence_timer),
+        )
+    except KeyboardInterrupt:
+        log("Shutdown requested...", role="SYSTEM", stage="SHUTDOWN")
+    finally:
+        # Cleanup Discord connection
+        if discord_client:
+            log("Disconnecting from Discord...", role="SYSTEM", stage="SHUTDOWN")
+            await discord_client.disconnect()
+            log("Discord disconnected", role="SYSTEM", stage="SHUTDOWN")
 
 
 if __name__ == "__main__":
