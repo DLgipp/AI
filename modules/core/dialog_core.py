@@ -2,7 +2,7 @@
 
 from collections import deque
 from enum import Enum, auto
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 
 
 class AssistantState(Enum):
@@ -26,10 +26,13 @@ class DialogueCore:
     def push_user_message(self, text: str) -> None:
         self._queue.append({"role": "user", "text": text})
 
-    def push_assistant_message(self, text: str) -> None:
-        self._queue.append({"role": "assistant", "text": text})
+    def push_assistant_message(self, text: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+        message = {"role": "assistant", "text": text}
+        if metadata:
+            message["tts_context"] = metadata.get("tts_context")
+        self._queue.append(message)
 
-    def pop_next(self) -> Optional[Dict[str, str]]:
+    def pop_next(self) -> Optional[Dict[str, Any]]:
         if not self._queue:
             return None
 

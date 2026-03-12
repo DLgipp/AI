@@ -13,9 +13,9 @@ from modules.events.event import Event
 from config import FRAME_DURATION, VAD_WINDOW_SECONDS
 
 VAD_FRAMES = int(VAD_WINDOW_SECONDS / FRAME_DURATION)
-SILENCE_FRAMES_TO_END = 2
-POST_SPEECH_FRAMES = 2
-PRE_SPEECH_FRAMES = 1
+SILENCE_FRAMES_TO_END = 4
+POST_SPEECH_FRAMES = 4
+PRE_SPEECH_FRAMES = 3
 
 class STTController:
     def __init__(self, bus, silence_timer):

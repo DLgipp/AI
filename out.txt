@@ -1,0 +1,1 @@
+{"message": "role='assistant' content='Hello! How can I help you today?' thinking='The user says \"Hi\". Probably a greeting. Respond friendly.' images=None tool_name=None tool_calls=None", "content": "Hello! How can I help you today?", "content_type": "<class 'str'>"}
